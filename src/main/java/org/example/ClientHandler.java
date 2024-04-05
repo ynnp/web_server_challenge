@@ -4,43 +4,67 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-import static org.example.WebServer.createClientSocket;
-import static org.example.WebServer.createServerSocket;
-
 public class ClientHandler {
-    final String RESPONSE_200_OK = "HTTP/1.1 200 OK\r\n\r\n";
-    final String RESPONSE_404_NOT_FOUND = "HTTP/1.1 404 NOT FOUND \r\n\r\n";
+    private final Client client;
 
-    public void sendResponseToClient() {
-        try (ServerSocket serverSocket = createServerSocket();
-             Socket clientSocket = createClientSocket(serverSocket)) {
-            String requestedResource = getRequestedResource(clientSocket);
-            if (requestedResource.equals("/")) {
-                String response = RESPONSE_200_OK + "Requested path: " + requestedResource + "\r\n";
-                clientSocket.getOutputStream().write(response.getBytes(StandardCharsets.UTF_8));
-            } else {
-                clientSocket.getOutputStream().write(RESPONSE_404_NOT_FOUND.getBytes(StandardCharsets.UTF_8));
-            }
-        } catch (IOException e) {
-            System.err.println("ERROR: Couldn't send response to client.\n" + e.getMessage());
-        }
+    public ClientHandler(Client client) {
+        this.client = client;
     }
 
-    private String getRequestedResource(Socket clientSocket) {
-        String[] linesArray = new String[0];
+    public void sendResponseToClient() {
+        Request request = getClientsRequest();
         try {
-            InputStream inputStream = clientSocket.getInputStream();
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
-            String line = bufferedReader.readLine();
-            linesArray = line.split(" ");
+            if (request.isGetMethod() && (request.isRootResource() || request.isIndexHtmlResource())) {
+                writeSuccessfulResponse();
+            } else {
+                writeUnsuccessfulResponse();
+            }
         } catch (IOException e) {
-            System.err.println("ERROR: Couldn't read client request.\n" + e.getMessage());
+            System.err.println("ERROR: Couldn't send response to a client.\n" + e.getMessage());
         }
 
-        return linesArray[1];
+    }
+
+    private Request getClientsRequest() {
+        Request request = null;
+        try {
+            InputStream inputStream = client.getClientSocket().getInputStream();
+            request = new Request(inputStream);
+        } catch (IOException e) {
+            System.err.println("ERROR: Couldn't initialize client's request.\n" + e.getMessage());
+        }
+
+        return request;
+    }
+
+    private void writeSuccessfulResponse() throws IOException {
+        writeResponse("HTTP/1.1 200 OK\r\n\r\n" + getWelcomeHtmlPage());
+    }
+
+    private void writeUnsuccessfulResponse() throws IOException {
+        writeResponse("HTTP/1.1 404 NOT FOUND \r\n\r\n");
+    }
+
+    private void writeResponse(String response) throws IOException {
+        client.getClientSocket().getOutputStream().write(response.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String getWelcomeHtmlPage() throws MalformedURLException {
+        StringBuilder htmlPage = new StringBuilder();
+        String line;
+        URL URL = new URL("file:/webserver/src/main/resources/index.html");
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(URL.openStream()))) {
+            while ((line = bufferedReader.readLine()) != null) {
+                htmlPage.append(line);
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR: Couldn't open index.html file.\n" + e.getMessage());
+        }
+
+        return htmlPage.toString();
     }
 }

@@ -2,31 +2,43 @@ package org.example;
 
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.net.Socket;
 
-import static org.example.Configuration.PORT_NUMBER;
+public class WebServer implements AutoCloseable {
+    private static final int PORT_NUMBER = 80;
+    private static WebServer webServer;
+    private ServerSocket serverSocket;
 
-public class WebServer {
-    public static ServerSocket createServerSocket() {
-        ServerSocket serverSocket = null;
+    public static WebServer getInstance() {
+        if (webServer == null) {
+            webServer = new WebServer();
+        }
+
+        return webServer;
+    }
+
+    private WebServer() {
+        initServerSocket();
+    }
+
+    private void initServerSocket() {
         try {
             serverSocket = new ServerSocket(PORT_NUMBER);
             serverSocket.setReuseAddress(true);
         } catch (IOException e) {
             System.err.println("ERROR: Couldn't initiate server socket.\n" + e.getMessage());
         }
+    }
 
+    public ServerSocket getServerSocket() {
         return serverSocket;
     }
 
-    public static Socket createClientSocket(ServerSocket serverSocket) {
-        Socket clientSocket = null;
+    @Override
+    public void close() {
         try {
-            clientSocket = serverSocket.accept();
+            serverSocket.close();
         } catch (IOException e) {
-            System.err.println("ERROR: Couldn't initiate client socket.\n" + e.getMessage());
+            System.err.println("ERROR: Couldn't close server socket.\n" + e.getMessage());
         }
-
-        return clientSocket;
     }
 }
