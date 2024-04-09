@@ -1,12 +1,16 @@
 package org.example;
 
+import org.example.request.Request;
+import org.example.response.ContentType;
+import org.example.response.Response;
+import org.example.response.ResponseCode;
+
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 
 public class ClientHandler {
     private final Client client;
@@ -16,41 +20,42 @@ public class ClientHandler {
     }
 
     public void sendResponseToClient() {
-        Request request = getClientsRequest();
-        try {
-            if (request.isGetMethod() && (request.isRootResource() || request.isIndexHtmlResource())) {
-                writeSuccessfulResponse();
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(client.getClientSocket().getInputStream()));
+             OutputStream outputStream = client.getClientSocket().getOutputStream()) {
+            Request request = Request.from(bufferedReader);
+            System.out.println("INFO: Client " + client.getId() + " requested resource: " + request.getPath());
+            if (request.isRootPath()) {
+                writeSuccessfulResponse(outputStream);
             } else {
-                writeUnsuccessfulResponse();
+                writeUnsuccessfulResponse(request.getPath(), outputStream);
             }
         } catch (IOException e) {
-            System.err.println("ERROR: Couldn't send response to a client.\n" + e.getMessage());
+            throw new RuntimeException(e);
         }
-
     }
 
-    private Request getClientsRequest() {
-        Request request = null;
-        try {
-            InputStream inputStream = client.getClientSocket().getInputStream();
-            request = new Request(inputStream);
-        } catch (IOException e) {
-            System.err.println("ERROR: Couldn't initialize client's request.\n" + e.getMessage());
-        }
-
-        return request;
+    private void writeSuccessfulResponse(OutputStream outputStream) throws IOException {
+        Response response = new Response.Builder()
+                .withResponseCode(ResponseCode.OK)
+                .withContentType(ContentType.TEXT_HTML)
+                .withBody(getWelcomeHtmlPage())
+                .build();
+        writeResponse(response, outputStream);
     }
 
-    private void writeSuccessfulResponse() throws IOException {
-        writeResponse("HTTP/1.1 200 OK\r\n\r\n" + getWelcomeHtmlPage());
+    private void writeUnsuccessfulResponse(String path, OutputStream outputStream) throws IOException {
+        Response response = new Response.Builder()
+                .withResponseCode(ResponseCode.NOT_FOUND)
+                .withContentType(ContentType.TEXT_PLAIN)
+                .withBody("ERROR: Sorry, resource " + path + " was not found.")
+                .build();
+        writeResponse(response, outputStream);
     }
 
-    private void writeUnsuccessfulResponse() throws IOException {
-        writeResponse("HTTP/1.1 404 NOT FOUND \r\n\r\n");
-    }
-
-    private void writeResponse(String response) throws IOException {
-        client.getClientSocket().getOutputStream().write(response.getBytes(StandardCharsets.UTF_8));
+    private void writeResponse(Response response, OutputStream outputStream) throws IOException {
+        System.out.println("INFO: Sending response: " + response.toString());
+        outputStream.write(response.serialize());
+        outputStream.flush();
     }
 
     private String getWelcomeHtmlPage() throws MalformedURLException {
