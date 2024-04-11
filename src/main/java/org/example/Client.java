@@ -1,6 +1,8 @@
 package org.example;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Random;
@@ -10,11 +12,15 @@ public class Client implements AutoCloseable {
     private Socket clientSocket;
 
     public Client(ServerSocket serverSocket) {
-        id = new Random().nextInt(1000);
-        initClientSocket(serverSocket);
+        this.id = generateId();
+        connectTo(serverSocket);
     }
 
-    private void initClientSocket(ServerSocket serverSocket) {
+    private static int generateId() {
+        return new Random().nextInt(1000);
+    }
+
+    private void connectTo(ServerSocket serverSocket) {
         try {
             clientSocket = serverSocket.accept();
         } catch (IOException e) {
@@ -26,8 +32,26 @@ public class Client implements AutoCloseable {
         return id;
     }
 
-    public Socket getClientSocket() {
-        return clientSocket;
+    public InputStream getInputStream() {
+        InputStream inputStream = null;
+        try {
+            inputStream = clientSocket.getInputStream();
+        } catch (IOException e) {
+            System.err.println("ERROR: Couldn't initialize client's input stream.\n" + e.getMessage());
+        }
+
+        return inputStream;
+    }
+
+    public OutputStream getOutputStream() {
+        OutputStream outputStream = null;
+        try {
+            outputStream = clientSocket.getOutputStream();
+        } catch (IOException e) {
+            System.err.println("ERROR: Couldn't initialize client's output stream.\n" + e.getMessage());
+        }
+
+        return outputStream;
     }
 
     @Override

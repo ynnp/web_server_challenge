@@ -1,5 +1,7 @@
 package org.example;
 
+import org.example.handlers.ClientHandler;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.concurrent.ExecutorService;
@@ -7,28 +9,26 @@ import java.util.concurrent.Executors;
 
 public class WebServer implements Runnable, AutoCloseable {
     private final int port;
-    private final int threadsNumber;
     private final ExecutorService executorService;
     private ServerSocket serverSocket;
 
     public WebServer(int port, int threadsNumber) {
         this.port = port;
-        this.threadsNumber = threadsNumber;
         this.executorService = Executors.newFixedThreadPool(threadsNumber);
     }
 
     @Override
     public void run() {
-        initServerSocket();
+        openServerSocket();
         while (true) {
             Client client = new Client(serverSocket);
             System.out.println("INFO: Created client with id: " + client.getId());
             ClientHandler clientHandler = new ClientHandler(client);
-            executorService.submit(clientHandler::sendResponseToClient);
+            executorService.submit(clientHandler::sendResponse);
         }
     }
 
-    private void initServerSocket() {
+    private void openServerSocket() {
         try {
             serverSocket = new ServerSocket(port);
             serverSocket.setReuseAddress(true);

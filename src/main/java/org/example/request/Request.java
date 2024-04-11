@@ -30,7 +30,10 @@ public class Request {
         String method = requestAsArray[0];
         return switch (method) {
             case "GET" -> Method.GET;
-            default -> throw new IllegalArgumentException("ERROR: " + method + " method is not allowed.\n");
+            case "POST" -> Method.POST;
+            case "PATCH" -> Method.PATCH;
+            case "DELETE" -> Method.DELETE;
+            default -> throw new IllegalArgumentException("ERROR: " + method + " method is not supported.\n");
         };
     }
 
@@ -41,6 +44,10 @@ public class Request {
     private Request(Method method, String path) {
         this.method = method;
         this.path = path;
+    }
+
+    public Method getMethod() {
+        return method;
     }
 
     public String getPath() {
